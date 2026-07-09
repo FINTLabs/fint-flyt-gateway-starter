@@ -14,6 +14,7 @@ import org.springframework.core.io.buffer.DataBufferLimitException
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.http.converter.HttpMessageNotReadableException
+import org.springframework.web.HttpMediaTypeNotSupportedException
 import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
@@ -45,6 +46,14 @@ class GlobalExceptionHandler {
     ): ResponseEntity<ErrorResponse> {
         discardRequestBody(request)
         return buildError(HttpStatus.BAD_REQUEST, buildNotReadableMessage(ex), request.requestURI)
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotSupportedException::class)
+    fun handleMediaTypeNotSupported(
+        ex: HttpMediaTypeNotSupportedException,
+        request: HttpServletRequest,
+    ): ResponseEntity<ErrorResponse> {
+        return buildError(HttpStatus.UNSUPPORTED_MEDIA_TYPE, ex.message, request.requestURI)
     }
 
     @ExceptionHandler(ValidationException::class)
