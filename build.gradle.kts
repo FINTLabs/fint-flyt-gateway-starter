@@ -26,8 +26,8 @@ plugins {
     id("maven-publish")
     id("io.github.ben-manes.versions") version "0.64.0"
     id("org.jlleitschuh.gradle.ktlint") version "14.2.0"
-    kotlin("jvm") version "2.4.20"
-    kotlin("plugin.spring") version "2.4.20"
+    kotlin("jvm") version "2.4.10"
+    kotlin("plugin.spring") version "2.4.10"
 }
 
 group = "no.novari"
