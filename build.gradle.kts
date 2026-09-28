@@ -10,11 +10,11 @@ buildscript {
         gradlePluginPortal()
     }
     dependencies {
-        classpath(platform("com.fasterxml.jackson:jackson-bom:2.22.2"))
+        classpath(platform("com.fasterxml.jackson:jackson-bom:2.22.3"))
         constraints {
             classpath("org.apache.httpcomponents.client5:httpclient5:5.6.4")
-            classpath("org.apache.httpcomponents.core5:httpcore5:5.4.3")
-            classpath("org.apache.httpcomponents.core5:httpcore5-h2:5.4.3")
+            classpath("org.apache.httpcomponents.core5:httpcore5:5.4.4")
+            classpath("org.apache.httpcomponents.core5:httpcore5-h2:5.4.4")
             classpath("org.apache.commons:commons-lang3:3.20.0")
         }
     }
@@ -35,7 +35,7 @@ version = findProperty("version") ?: "1.0-SNAPSHOT"
 
 extra["kotlin.version"] = Versions.KOTLIN
 extra["httpclient5.version"] = "5.6.3"
-extra["httpcore5.version"] = "5.4.3"
+extra["httpcore5.version"] = "5.4.4"
 extra["jackson-bom.version"] = "2.21.5"
 extra["log4j2.version"] = "2.25.5"
 extra["tomcat.version"] = "10.1.59"
@@ -83,7 +83,7 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.security:spring-security-test")
     testImplementation("com.ninja-squad:springmockk:5.0.1")
-    testImplementation("org.mockito.kotlin:mockito-kotlin:6.3.0")
+    testImplementation("org.mockito.kotlin:mockito-kotlin:6.4.0")
 }
 
 tasks.withType<Test>().configureEach {
