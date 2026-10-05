@@ -1,28 +1,20 @@
 package no.novari.flyt.gateway.instance.validation.constraints
 
-import io.mockk.MockKAnnotations
-import io.mockk.impl.annotations.MockK
 import jakarta.validation.ConstraintValidatorContext
 import no.novari.flyt.gateway.instance.validation.constraints.Base64Validator
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
+import org.mockito.kotlin.mock
 
 class Base64ValidatorTest {
     private val validator = Base64Validator()
 
-    @MockK(relaxed = true)
-    private lateinit var context: ConstraintValidatorContext
-
-    @BeforeEach
-    fun setup() {
-        MockKAnnotations.init(this, relaxUnitFun = true)
-    }
+    private val context: ConstraintValidatorContext = mock()
 
     @Nested
     @DisplayName("Permissive cases that should be valid")
