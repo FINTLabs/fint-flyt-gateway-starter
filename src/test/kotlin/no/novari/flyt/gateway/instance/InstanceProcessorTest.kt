@@ -2,7 +2,6 @@ package no.novari.flyt.gateway.instance
 
 import no.novari.flyt.gateway.instance.exception.FileUploadException
 import no.novari.flyt.gateway.instance.kafka.InstanceErrorEventProducerService
-import no.novari.flyt.gateway.instance.kafka.IntegrationRequestProducerService
 import no.novari.flyt.gateway.instance.kafka.ReceivedInstanceEventProducerService
 import no.novari.flyt.gateway.instance.model.File
 import no.novari.flyt.gateway.instance.model.Integration
@@ -31,7 +30,7 @@ import kotlin.test.assertEquals
 
 class InstanceProcessorTest {
     @Mock
-    private lateinit var integrationRequestProducerService: IntegrationRequestProducerService
+    private lateinit var intgrConfClient: IntgrConfClient
 
     @Mock
     private lateinit var instanceValidationService: InstanceValidationService
@@ -73,7 +72,7 @@ class InstanceProcessorTest {
         val mockIntegration = mock<Integration>()
         whenever(mockIntegration.id).thenReturn(1L)
         whenever(mockIntegration.state).thenReturn(Integration.State.ACTIVE)
-        whenever(integrationRequestProducerService.get(any()))
+        whenever(intgrConfClient.getIntegration(any()))
             .thenReturn(mockIntegration)
 
         whenever(sourceApplicationAuthorizationService.getSourceApplicationId(any()))

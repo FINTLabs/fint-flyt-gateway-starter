@@ -83,12 +83,13 @@ dependencies {
     implementation("com.fasterxml.jackson.module:jackson-module-parameter-names")
     implementation("org.apache.httpcomponents.client5:httpclient5")
 
-    api("no.novari:flyt-web-resource-server:4.1.1")
+    api("no.novari:flyt-web-resource-server:5.0.0-rc-2")
     api("no.novari:flyt-kafka:7.4.1")
 
     testImplementation(kotlin("test"))
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.mockito.kotlin:mockito-kotlin:6.4.0")
+    testRuntimeOnly("org.aspectj:aspectjweaver") // @EnableRetry; the gateways bring their own
 }
 
 tasks.withType<Test>().configureEach {
