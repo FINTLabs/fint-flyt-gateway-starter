@@ -209,7 +209,7 @@ Optional:
 
 - `novari.flyt.intgr-conf-service-url` (default `http://fint-flyt-intgr-conf-service:8080${server.servlet.context-path:}`)
 - `novari.flyt.history-service-url` (default `http://fint-flyt-history-service:8080${server.servlet.context-path:}`)
-- `spring.http.client.connect-timeout` (default `2s`) and `spring.http.client.read-timeout` (default `5s`) for intgr-conf-service and history-service. The defaults apply only to these two clients. file-service always uses 300 s.
+- `spring.http.client.connect-timeout` (default `2s`) and `spring.http.client.read-timeout` (default `5s`) for intgr-conf-service, history-service and the token request to NAM. The defaults apply only to these. file-service always uses 300 s.
 
 The URL defaults assume the app runs with the same context path as the two services, which is the case in all FLYT overlays.
 
