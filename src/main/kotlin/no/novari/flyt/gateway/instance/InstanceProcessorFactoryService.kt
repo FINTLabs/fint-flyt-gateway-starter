@@ -1,7 +1,6 @@
 package no.novari.flyt.gateway.instance
 
 import no.novari.flyt.gateway.instance.kafka.InstanceErrorEventProducerService
-import no.novari.flyt.gateway.instance.kafka.IntegrationRequestProducerService
 import no.novari.flyt.gateway.instance.kafka.ReceivedInstanceEventProducerService
 import no.novari.flyt.gateway.instance.validation.InstanceValidationService
 import no.novari.flyt.webresourceserver.security.client.sourceapplication.SourceApplicationAuthorizationService
@@ -9,7 +8,7 @@ import org.springframework.stereotype.Service
 
 @Service
 class InstanceProcessorFactoryService(
-    private val integrationRequestProducerService: IntegrationRequestProducerService,
+    private val intgrConfClient: IntgrConfClient,
     private val instanceValidationService: InstanceValidationService,
     private val receivedInstanceEventProducerService: ReceivedInstanceEventProducerService,
     private val instanceErrorEventProducerService: InstanceErrorEventProducerService,
@@ -34,7 +33,7 @@ class InstanceProcessorFactoryService(
         instanceMapper: InstanceMapper<T>,
     ): InstanceProcessor<T> {
         return InstanceProcessor(
-            integrationRequestProducerService = integrationRequestProducerService,
+            intgrConfClient = intgrConfClient,
             instanceValidationService = instanceValidationService,
             receivedInstanceEventProducerService = receivedInstanceEventProducerService,
             instanceErrorEventProducerService = instanceErrorEventProducerService,
@@ -64,7 +63,7 @@ class InstanceProcessorFactoryService(
         multipartInstanceMapper: MultipartInstanceMapper<T>,
     ): MultipartInstanceProcessor<T> {
         return MultipartInstanceProcessor(
-            integrationRequestProducerService = integrationRequestProducerService,
+            intgrConfClient = intgrConfClient,
             instanceValidationService = instanceValidationService,
             receivedInstanceEventProducerService = receivedInstanceEventProducerService,
             instanceErrorEventProducerService = instanceErrorEventProducerService,
