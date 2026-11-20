@@ -4,11 +4,10 @@ import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.AutoConfiguration
 import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder
-import org.springframework.boot.http.client.ClientHttpRequestFactorySettings
+import org.springframework.boot.http.client.HttpClientSettings
 import org.springframework.context.annotation.Bean
 import org.springframework.http.client.ClientHttpRequestFactory
 import org.springframework.http.converter.FormHttpMessageConverter
-import org.springframework.retry.annotation.EnableRetry
 import org.springframework.security.authentication.AnonymousAuthenticationToken
 import org.springframework.security.core.authority.AuthorityUtils
 import org.springframework.security.oauth2.client.AuthorizedClientServiceOAuth2AuthorizedClientManager
@@ -24,7 +23,6 @@ import org.springframework.web.client.RestClient
 import java.time.Duration
 
 @AutoConfiguration
-@EnableRetry
 class RestClientConfiguration {
     // client_credentials tokens belong to the app, not to an HTTP session, so they are kept in the
     // OAuth2AuthorizedClientService. One manager serves all registrations below.
@@ -33,7 +31,7 @@ class RestClientConfiguration {
         clientRegistrationRepository: ClientRegistrationRepository,
         authorizedClientService: OAuth2AuthorizedClientService,
         requestFactoryBuilder: ClientHttpRequestFactoryBuilder<*>,
-        requestFactorySettings: ClientHttpRequestFactorySettings,
+        requestFactorySettings: HttpClientSettings,
     ): OAuth2AuthorizedClientManager {
         // The default token client has no timeouts. Same converters and error handler as its default, plus ours.
         val tokenResponseClient = RestClientClientCredentialsTokenResponseClient()
@@ -41,10 +39,9 @@ class RestClientConfiguration {
             RestClient
                 .builder()
                 .requestFactory(requestFactoryBuilder.build(requestFactorySettings.withDefaultTimeouts()))
-                .messageConverters { converters ->
-                    converters.clear()
-                    converters.add(FormHttpMessageConverter())
-                    converters.add(OAuth2AccessTokenResponseHttpMessageConverter())
+                .configureMessageConverters { converters ->
+                    converters.addCustomConverter(FormHttpMessageConverter())
+                    converters.addCustomConverter(OAuth2AccessTokenResponseHttpMessageConverter())
                 }.defaultStatusHandler(OAuth2ErrorResponseErrorHandler())
                 .build(),
         )
@@ -59,13 +56,13 @@ class RestClientConfiguration {
         return manager
     }
 
-    // Large files take time, so file-service has fixed long timeouts that spring.http.client.* does not change.
+    // Large files take time, so file-service has fixed long timeouts that spring.http.clients.* does not change.
     @Bean
     fun fileRestClient(
         restClientBuilder: RestClient.Builder,
         @Qualifier("internalClientAuthorizedClientManager") authorizedClientManager: OAuth2AuthorizedClientManager,
         requestFactoryBuilder: ClientHttpRequestFactoryBuilder<*>,
-        requestFactorySettings: ClientHttpRequestFactorySettings,
+        requestFactorySettings: HttpClientSettings,
     ): RestClient =
         internalClient(
             restClientBuilder,
@@ -79,7 +76,7 @@ class RestClientConfiguration {
         restClientBuilder: RestClient.Builder,
         @Qualifier("internalClientAuthorizedClientManager") authorizedClientManager: OAuth2AuthorizedClientManager,
         requestFactoryBuilder: ClientHttpRequestFactoryBuilder<*>,
-        requestFactorySettings: ClientHttpRequestFactorySettings,
+        requestFactorySettings: HttpClientSettings,
         @Value(
             "\${novari.flyt.intgr-conf-service-url:http://fint-flyt-intgr-conf-service:8080\${server.servlet.context-path:}}",
         )
@@ -98,7 +95,7 @@ class RestClientConfiguration {
         restClientBuilder: RestClient.Builder,
         @Qualifier("internalClientAuthorizedClientManager") authorizedClientManager: OAuth2AuthorizedClientManager,
         requestFactoryBuilder: ClientHttpRequestFactoryBuilder<*>,
-        requestFactorySettings: ClientHttpRequestFactorySettings,
+        requestFactorySettings: HttpClientSettings,
         @Value(
             "\${novari.flyt.history-service-url:http://fint-flyt-history-service:8080\${server.servlet.context-path:}}",
         )
@@ -128,8 +125,8 @@ class RestClientConfiguration {
     }
 
     // The calls block the incoming request, so they must not fall back to the HTTP client's minutes-long defaults.
-    // spring.http.client.connect-timeout and read-timeout in the app override these.
-    private fun ClientHttpRequestFactorySettings.withDefaultTimeouts(): ClientHttpRequestFactorySettings =
+    // spring.http.clients.connect-timeout and read-timeout in the app override these.
+    private fun HttpClientSettings.withDefaultTimeouts(): HttpClientSettings =
         withTimeouts(connectTimeout() ?: DEFAULT_CONNECT_TIMEOUT, readTimeout() ?: DEFAULT_READ_TIMEOUT)
 
     private companion object {

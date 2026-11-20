@@ -6,7 +6,7 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder
-import org.springframework.boot.http.client.ClientHttpRequestFactorySettings
+import org.springframework.boot.http.client.HttpClientSettings
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpMethod
 import org.springframework.http.HttpStatus
@@ -28,7 +28,7 @@ class HistoryClientTest {
                 RestClient.builder(),
                 testAuthorizedClientManager(),
                 ClientHttpRequestFactoryBuilder.detect(),
-                ClientHttpRequestFactorySettings.defaults(),
+                HttpClientSettings.defaults(),
                 "http://fint-flyt-history-service:8080/beta/afk-no",
             ).mutate()
     private val server = MockRestServiceServer.bindTo(restClientBuilder).build()

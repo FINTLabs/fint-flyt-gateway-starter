@@ -1,0 +1,30 @@
+spring:
+  kafka:
+    bootstrap-servers: ${spring.embedded.kafka.brokers}
+  security:
+    oauth2:
+      client:
+        provider:
+          fint-idp:
+            token-uri: http://localhost/token
+        registration:
+          file-service:
+            authorization-grant-type: client_credentials
+            provider: fint-idp
+            client-id: client
+            client-secret: secret
+
+novari:
+  kafka:
+    application-id: test-gateway
+    topic:
+      org-id: test-org
+      domain-context: flyt
+      default-replicas: 1
+  flyt:
+    file-service-url: http://localhost
+    security:
+      external:
+        paths: /api/test/**
+        source-application-id: 123
+        expected-client-id: test-client

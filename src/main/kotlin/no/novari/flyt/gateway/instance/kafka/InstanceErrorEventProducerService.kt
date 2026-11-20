@@ -1,7 +1,6 @@
 package no.novari.flyt.gateway.instance.kafka
 
 import no.novari.flyt.gateway.instance.ErrorCode
-import no.novari.flyt.gateway.instance.config.properties.InstanceProcessingEventsConfigurationProperties
 import no.novari.flyt.gateway.instance.exception.AbstractInstanceRejectedException
 import no.novari.flyt.gateway.instance.exception.FileUploadException
 import no.novari.flyt.gateway.instance.exception.IntegrationDeactivatedException
@@ -10,80 +9,33 @@ import no.novari.flyt.gateway.instance.exception.NoIntegrationException
 import no.novari.flyt.gateway.instance.validation.InstanceValidationErrorMappingService
 import no.novari.flyt.gateway.instance.validation.InstanceValidationException
 import no.novari.flyt.kafka.instanceflow.headers.InstanceFlowHeaders
-import no.novari.flyt.kafka.instanceflow.producing.InstanceFlowProducerRecord
-import no.novari.flyt.kafka.instanceflow.producing.InstanceFlowTemplateFactory
+import no.novari.flyt.kafka.instanceflow.producing.send
 import no.novari.flyt.kafka.model.Error
 import no.novari.flyt.kafka.model.ErrorCollection
 import no.novari.flyt.kafka.model.InstanceErrorEvent
 import no.novari.flyt.kafka.model.InstanceErrorOrigin
-import no.novari.kafka.topic.ErrorEventTopicService
-import no.novari.kafka.topic.configuration.EventTopicConfiguration
-import no.novari.kafka.topic.name.ErrorEventTopicNameParameters
-import no.novari.kafka.topic.name.TopicNamePrefixParameters
-import org.springframework.stereotype.Service
+import no.novari.kafka.starter.topic.KafkaTopics
+import org.springframework.kafka.core.KafkaTemplate
 
-@Service
+/** The topic is created by `KafkaConfiguration`. */
 class InstanceErrorEventProducerService(
-    errorEventTopicService: ErrorEventTopicService,
-    instanceFlowTemplateFactory: InstanceFlowTemplateFactory,
+    private val kafkaTemplate: KafkaTemplate<String, InstanceErrorEvent>,
+    topics: KafkaTopics,
     private val instanceValidationErrorMappingService: InstanceValidationErrorMappingService,
-    instanceProcessingEventsConfigurationProperties: InstanceProcessingEventsConfigurationProperties,
 ) {
-    companion object {
-        private const val ERROR_EVENT_NAME = "instance-error"
-    }
-
-    private val instanceErrorTopicNameParameters =
-        ErrorEventTopicNameParameters
-            .builder()
-            .topicNamePrefixParameters(
-                TopicNamePrefixParameters
-                    .stepBuilder()
-                    .orgIdApplicationDefault()
-                    .domainContextApplicationDefault()
-                    .build(),
-            ).errorEventName(ERROR_EVENT_NAME)
-            .build()
-
-    private val template = instanceFlowTemplateFactory.createTemplate(InstanceErrorEvent::class.java)
-
-    init {
-        errorEventTopicService.createOrModifyTopic(
-            instanceErrorTopicNameParameters,
-            EventTopicConfiguration
-                .stepBuilder()
-                .partitions(instanceProcessingEventsConfigurationProperties.partitions)
-                .retentionTime(instanceProcessingEventsConfigurationProperties.retentionTime)
-                .cleanupFrequency(instanceProcessingEventsConfigurationProperties.cleanupFrequency)
-                .build(),
-        )
-    }
+    private val topic = topics.errorEvent(ERROR_EVENT_NAME)
 
     private fun send(
         headers: InstanceFlowHeaders,
         errors: ErrorCollection,
     ) {
-        template.send(
-            InstanceFlowProducerRecord
-                .builder<InstanceErrorEvent>()
-                .topicNameParameters(instanceErrorTopicNameParameters)
-                .instanceFlowHeaders(headers)
-                .value(InstanceErrorEvent(name = InstanceErrorOrigin.RECEIVAL, errors = errors))
-                .build(),
-        )
+        kafkaTemplate.send(topic, headers, InstanceErrorEvent(name = InstanceErrorOrigin.RECEIVAL, errors = errors))
     }
 
     private fun singleError(
         code: ErrorCode,
         args: Map<String, String?> = emptyMap(),
-    ): ErrorCollection =
-        ErrorCollection(
-            Error
-                .builder()
-                .errorCode(code.getCode())
-                .args(args)
-                .build(),
-        )
+    ): ErrorCollection = ErrorCollection(Error(errorCode = code.getCode(), args = args))
 
     fun publishInstanceValidationErrorEvent(
         instanceFlowHeaders: InstanceFlowHeaders,
@@ -172,5 +124,9 @@ class InstanceErrorEventProducerService(
 
     fun publishGeneralSystemErrorEvent(instanceFlowHeaders: InstanceFlowHeaders) {
         send(instanceFlowHeaders, singleError(ErrorCode.GENERAL_SYSTEM_ERROR))
+    }
+
+    internal companion object {
+        internal const val ERROR_EVENT_NAME = "instance-error"
     }
 }

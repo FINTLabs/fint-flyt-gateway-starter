@@ -1,9 +1,7 @@
 package no.novari.flyt.gateway.instance.validation
 
 import jakarta.validation.Validator
-import org.springframework.stereotype.Service
 
-@Service
 class InstanceValidationService(
     private val validator: Validator,
 ) {

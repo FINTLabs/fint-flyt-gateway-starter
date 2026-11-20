@@ -11,13 +11,12 @@ import no.novari.flyt.gateway.instance.model.SourceApplicationIdAndSourceApplica
 import no.novari.flyt.gateway.instance.validation.InstanceValidationException
 import no.novari.flyt.gateway.instance.validation.InstanceValidationService
 import no.novari.flyt.kafka.instanceflow.headers.InstanceFlowHeaders
-import no.novari.flyt.webresourceserver.security.client.sourceapplication.SourceApplicationAuthorizationService
+import no.novari.flyt.security.FlytSecurityProperties
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
-import org.springframework.security.core.Authentication
 import org.springframework.web.server.ResponseStatusException
 import java.util.UUID
 
@@ -26,7 +25,7 @@ class InstanceProcessor<T : Any>(
     private val instanceValidationService: InstanceValidationService,
     private val receivedInstanceEventProducerService: ReceivedInstanceEventProducerService,
     private val instanceErrorEventProducerService: InstanceErrorEventProducerService,
-    private val sourceApplicationAuthorizationService: SourceApplicationAuthorizationService,
+    private val flytSecurityProperties: FlytSecurityProperties,
     private val fileClient: FileClient,
     private val sourceApplicationIntegrationIdFunction: (T) -> String,
     private val sourceApplicationInstanceIdFunction: (T) -> String,
@@ -35,43 +34,31 @@ class InstanceProcessor<T : Any>(
     @Value("\${novari.flyt.gateway-starter.check-integration-exists:true}")
     var checkIntegrationExists: Boolean = true
 
-    fun processInstance(
-        authentication: Authentication,
-        incomingInstance: T,
-    ): ResponseEntity<Void> {
-        return processInstance(incomingInstance) {
-            sourceApplicationAuthorizationService.getSourceApplicationId(authentication)
-        }
-    }
+    /** Processes an instance from the gateway's source application, see `novari.flyt.security.external`. */
+    fun processInstance(incomingInstance: T): ResponseEntity<Void> =
+        processInstance(flytSecurityProperties.configuredSourceApplicationId(), incomingInstance)
 
     fun processInstance(
         sourceApplicationId: Long,
         incomingInstance: T,
     ): ResponseEntity<Void> {
-        return processInstance(incomingInstance) { sourceApplicationId }
-    }
-
-    private fun processInstance(
-        incomingInstance: T,
-        sourceApplicationIdSupplier: () -> Long,
-    ): ResponseEntity<Void> {
-        val headersBuilder = InstanceFlowHeaders.builder()
         val fileIds = mutableListOf<UUID>()
-        val sourceApplicationId: Long
+        var headers =
+            InstanceFlowHeaders(
+                sourceApplicationId = sourceApplicationId,
+                correlationId = UUID.randomUUID(),
+                fileIds = fileIds,
+            )
 
         try {
-            sourceApplicationId = sourceApplicationIdSupplier()
-
             val sourceApplicationIntegrationId = sourceApplicationIntegrationIdFunction(incomingInstance)
             val sourceApplicationInstanceId = sourceApplicationInstanceIdFunction(incomingInstance)
 
-            headersBuilder.apply {
-                correlationId(UUID.randomUUID())
-                sourceApplicationId(sourceApplicationId)
-                fileIds(fileIds)
-                sourceApplicationIntegrationId(sourceApplicationIntegrationId)
-                sourceApplicationInstanceId(sourceApplicationInstanceId)
-            }
+            headers =
+                headers.copy(
+                    sourceApplicationIntegrationId = sourceApplicationIntegrationId,
+                    sourceApplicationInstanceId = sourceApplicationInstanceId,
+                )
 
             instanceValidationService.validate(incomingInstance)?.let {
                 throw InstanceValidationException(it)
@@ -95,28 +82,28 @@ class InstanceProcessor<T : Any>(
                     intgrConfClient
                         .getIntegration(idPair)
                         ?: throw NoIntegrationException(idPair)
-                headersBuilder.integrationId(integration.id)
+                headers = headers.copy(integrationId = integration.id)
                 if (integration.state == Integration.State.DEACTIVATED) {
                     throw IntegrationDeactivatedException(integration)
                 }
             }
         } catch (e: InstanceValidationException) {
-            instanceErrorEventProducerService.publishInstanceValidationErrorEvent(headersBuilder.build(), e)
+            instanceErrorEventProducerService.publishInstanceValidationErrorEvent(headers, e)
             throw ResponseStatusException(
-                HttpStatus.UNPROCESSABLE_ENTITY,
+                HttpStatus.UNPROCESSABLE_CONTENT,
                 buildString {
                     append("Validation error: ")
                     append(e.validationErrors.joinToString { "'${it.fieldPath} ${it.errorMessage}'" })
                 },
             )
         } catch (e: NoIntegrationException) {
-            instanceErrorEventProducerService.publishNoIntegrationFoundErrorEvent(headersBuilder.build(), e)
-            throw ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, e.message)
+            instanceErrorEventProducerService.publishNoIntegrationFoundErrorEvent(headers, e)
+            throw ResponseStatusException(HttpStatus.UNPROCESSABLE_CONTENT, e.message)
         } catch (e: IntegrationDeactivatedException) {
-            instanceErrorEventProducerService.publishIntegrationDeactivatedErrorEvent(headersBuilder.build(), e)
-            throw ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, e.message)
+            instanceErrorEventProducerService.publishIntegrationDeactivatedErrorEvent(headers, e)
+            throw ResponseStatusException(HttpStatus.UNPROCESSABLE_CONTENT, e.message)
         } catch (e: RuntimeException) {
-            instanceErrorEventProducerService.publishGeneralSystemErrorEvent(headersBuilder.build())
+            instanceErrorEventProducerService.publishGeneralSystemErrorEvent(headers)
             throw e
         }
 
@@ -130,19 +117,19 @@ class InstanceProcessor<T : Any>(
                         .postFile(file)
                         .also(fileIds::add)
                 }
-            receivedInstanceEventProducerService.publish(headersBuilder.build(), instanceObject)
+            receivedInstanceEventProducerService.publish(headers, instanceObject)
             ResponseEntity.accepted().build()
         } catch (e: AbstractInstanceRejectedException) {
             log.error("Instance receival error", e)
-            instanceErrorEventProducerService.publishInstanceRejectedErrorEvent(headersBuilder.build(), e)
-            throw ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, e.message, e)
+            instanceErrorEventProducerService.publishInstanceRejectedErrorEvent(headers, e)
+            throw ResponseStatusException(HttpStatus.UNPROCESSABLE_CONTENT, e.message, e)
         } catch (e: FileUploadException) {
             log.error("File upload error", e)
-            instanceErrorEventProducerService.publishInstanceFileUploadErrorEvent(headersBuilder.build(), e)
+            instanceErrorEventProducerService.publishInstanceFileUploadErrorEvent(headers, e)
             throw ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, e.message, e)
         } catch (e: Exception) {
             log.error("General system error", e)
-            instanceErrorEventProducerService.publishGeneralSystemErrorEvent(headersBuilder.build())
+            instanceErrorEventProducerService.publishGeneralSystemErrorEvent(headers)
             throw ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "General system error", e)
         }
     }

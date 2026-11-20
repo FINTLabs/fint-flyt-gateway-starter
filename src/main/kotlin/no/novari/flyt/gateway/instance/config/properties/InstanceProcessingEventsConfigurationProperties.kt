@@ -1,6 +1,6 @@
 package no.novari.flyt.gateway.instance.config.properties
 
-import no.novari.kafka.topic.configuration.EventCleanupFrequency
+import no.novari.kafka.starter.topic.EventCleanupFrequency
 import org.springframework.boot.context.properties.ConfigurationProperties
 import java.time.Duration
 

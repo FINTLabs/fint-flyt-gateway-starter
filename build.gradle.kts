@@ -1,120 +1,95 @@
-import com.github.benmanes.gradle.versions.updates.DependencyUpdatesTask
-import org.springframework.boot.gradle.plugin.SpringBootPlugin
-
-object Versions {
-    const val KOTLIN = "2.4.10"
-}
-
-buildscript {
-    repositories {
-        gradlePluginPortal()
-    }
-    dependencies {
-        classpath(platform("com.fasterxml.jackson:jackson-bom:2.23.0"))
-        constraints {
-            classpath("org.apache.httpcomponents.client5:httpclient5:5.6.5")
-            classpath("org.apache.httpcomponents.core5:httpcore5:5.4.4")
-            classpath("org.apache.httpcomponents.core5:httpcore5-h2:5.4.4")
-            classpath("org.apache.commons:commons-lang3:3.22.0")
-        }
-    }
-}
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
 
 plugins {
-    id("org.springframework.boot") version "3.5.16" apply false
-    id("io.spring.dependency-management") version "1.1.7"
-    id("maven-publish")
-    id("io.github.ben-manes.versions") version "0.67.0"
-    id("org.jlleitschuh.gradle.ktlint") version "14.2.0"
-    kotlin("jvm") version "2.4.10"
-    kotlin("plugin.spring") version "2.4.10"
+    `java-library`
+    `maven-publish`
+    alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.kotlin.spring)
+    alias(libs.plugins.ktlint)
 }
 
 group = "no.novari"
-version = findProperty("version") ?: "1.0-SNAPSHOT"
-
-extra["kotlin.version"] = Versions.KOTLIN
-extra["httpclient5.version"] = "5.6.3"
-extra["httpcore5.version"] = "5.4.4"
-extra["jackson-bom.version"] = "2.21.7"
-extra["log4j2.version"] = "2.25.5"
-extra["tomcat.version"] = "10.1.59"
-
-ktlint {
-    version.set("1.8.0")
-}
 
 private val fintLabsRepo = uri("https://repo.fintlabs.no/releases")
 
 repositories {
-    mavenLocal()
+    mavenCentral()
     maven {
         url = fintLabsRepo
     }
-    mavenCentral()
 }
 
-dependencyManagement {
-    imports {
-        mavenBom(SpringBootPlugin.BOM_COORDINATES)
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
     }
+    withSourcesJar()
+}
+
+// Build with JDK 25, publish for Java 21.
+tasks.withType<JavaCompile>().configureEach {
+    options.release = 21
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget = JvmTarget.JVM_21
+        freeCompilerArgs.add("-Xjdk-release=21")
+        // Spring Boot 4.1 manages Kotlin 2.3, so apps may run with a 2.3 stdlib.
+        apiVersion = KotlinVersion.KOTLIN_2_3
+    }
+    // The stdlib version Spring Boot manages, not the Kotlin plugin's, so the library does not upgrade it in apps.
+    coreLibrariesVersion =
+        libs.versions.kotlin.stdlib
+            .get()
+}
+
+ktlint {
+    version = libs.versions.ktlint.cli
 }
 
 dependencyLocking {
     lockAllConfigurations()
 }
 
+// The Spring Boot BOM sets versions in this build only. It is not published, so it cannot change the app's Spring Boot
+// or Kotlin version. versionMapping below publishes the resolved versions instead.
+val springBootBom = configurations.dependencyScope("springBootBom")
+listOf("compileClasspath", "runtimeClasspath", "testCompileClasspath", "testRuntimeClasspath").forEach {
+    configurations.named(it) { extendsFrom(springBootBom.get()) }
+}
+
 dependencies {
+    springBootBom(platform(libs.spring.boot.dependencies))
+
     constraints {
-        implementation("at.yawk.lz4:lz4-java:1.14.0") {
-            because("Fixes CVE-2026-59949 in the kafka-clients transitive dependency")
-        }
-        implementation("org.xerial.snappy:snappy-java:1.1.10.12") {
-            because("Fixes CVE-2026-93451, CVE-2026-108106 and CVE-2026-116590 in kafka-clients")
+        ktlint(libs.logback.core) {
+            because(
+                "ktlint 1.8.0 brings logback-core 1.3.16, which has CVE-2026-1225, CVE-2026-9828 and " +
+                    "CVE-2026-10532. Only the ktlint tool classpath, not the published library",
+            )
         }
     }
 
+    api(libs.flyt.kafka)
+    api(libs.flyt.security.starter)
+
+    implementation("org.springframework.boot:spring-boot-starter-webmvc")
     implementation("org.springframework.boot:spring-boot-starter-validation")
-    implementation("org.springframework.boot:spring-boot-starter-web")
-    implementation("org.springframework.security:spring-security-oauth2-client")
-
-    implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
-    implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
-    implementation("com.fasterxml.jackson.module:jackson-module-parameter-names")
+    implementation("org.springframework.boot:spring-boot-starter-restclient")
     implementation("org.apache.httpcomponents.client5:httpclient5")
-
-    api("no.novari:flyt-web-resource-server:5.0.0")
-    api("no.novari:flyt-kafka:7.4.1")
 
     testImplementation(kotlin("test"))
     testImplementation("org.springframework.boot:spring-boot-starter-test")
-    testImplementation("org.mockito.kotlin:mockito-kotlin:6.4.0")
-    testRuntimeOnly("org.aspectj:aspectjweaver") // @EnableRetry; the gateways bring their own
+    testImplementation("org.springframework.boot:spring-boot-starter-kafka-test")
+    testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
+    testImplementation(libs.mockito.kotlin)
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
-tasks.withType<Test>().configureEach {
+tasks.test {
     useJUnitPlatform()
-}
-
-kotlin {
-    jvmToolchain(25)
-}
-
-tasks.named<Jar>("jar") {
-    enabled = true
-}
-
-java {
-    withSourcesJar()
-}
-
-// Dependabot resolves with JDK 21; an explicit release keeps JVM 25 as the resolution target so gradle.lockfile gets updated.
-tasks.withType<JavaCompile>().configureEach {
-    options.release.set(25)
-}
-
-tasks.named("check") {
-    dependsOn("ktlintCheck")
 }
 
 publishing {
@@ -133,19 +108,12 @@ publishing {
     publications {
         create<MavenPublication>("maven") {
             from(components["java"])
+            // Publish the versions resolved from the Spring Boot BOM, so consumers do not need the BOM.
+            versionMapping {
+                allVariants {
+                    fromResolutionResult()
+                }
+            }
         }
-    }
-}
-
-fun isNonStable(version: String): Boolean {
-    val stableKeyword = listOf("RELEASE", "FINAL", "GA").any { version.uppercase().contains(it) }
-    val regex = "^[0-9,.v-]+(-r)?$".toRegex()
-    val isStable = stableKeyword || regex.matches(version)
-    return !isStable
-}
-
-tasks.named<DependencyUpdatesTask>("dependencyUpdates") {
-    rejectVersionIf {
-        isNonStable(candidate.version)
     }
 }

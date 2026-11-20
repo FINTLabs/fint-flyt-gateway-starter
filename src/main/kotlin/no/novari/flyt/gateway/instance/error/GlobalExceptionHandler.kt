@@ -1,7 +1,5 @@
 package no.novari.flyt.gateway.instance.error
 
-import com.fasterxml.jackson.databind.exc.InvalidNullException
-import com.fasterxml.jackson.databind.exc.MismatchedInputException
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.validation.UnexpectedTypeException
 import jakarta.validation.ValidationException
@@ -19,7 +17,10 @@ import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
 import org.springframework.web.server.ResponseStatusException
 import org.springframework.web.server.ServerWebInputException
+import tools.jackson.databind.exc.InvalidNullException
+import tools.jackson.databind.exc.MismatchedInputException
 import java.time.OffsetDateTime
+import org.springframework.web.ErrorResponse as SpringErrorResponse
 
 @RestControllerAdvice
 @Order(Ordered.LOWEST_PRECEDENCE)
@@ -65,7 +66,7 @@ class GlobalExceptionHandler {
         ex: NoIntegrationException,
         request: HttpServletRequest,
     ): ResponseEntity<ErrorResponse> {
-        return buildError(HttpStatus.UNPROCESSABLE_ENTITY, ex.message, request.requestURI)
+        return buildError(HttpStatus.UNPROCESSABLE_CONTENT, ex.message, request.requestURI)
     }
 
     @ExceptionHandler(IntegrationDeactivatedException::class)
@@ -73,7 +74,7 @@ class GlobalExceptionHandler {
         ex: IntegrationDeactivatedException,
         request: HttpServletRequest,
     ): ResponseEntity<ErrorResponse> {
-        return buildError(HttpStatus.UNPROCESSABLE_ENTITY, ex.message, request.requestURI)
+        return buildError(HttpStatus.UNPROCESSABLE_CONTENT, ex.message, request.requestURI)
     }
 
     @ExceptionHandler(DataBufferLimitException::class)
@@ -84,7 +85,7 @@ class GlobalExceptionHandler {
         val url = ErrorResponseUtils.resolveFullUrl(request)
         log.warn("Payload too large for {} {}: {}", request.method, url, ex.message)
         return ResponseEntity
-            .status(HttpStatus.PAYLOAD_TOO_LARGE)
+            .status(HttpStatus.CONTENT_TOO_LARGE)
             .body(ErrorResponseUtils.payloadTooLargeBody)
     }
 
@@ -123,6 +124,10 @@ class GlobalExceptionHandler {
         ex: Exception,
         request: HttpServletRequest,
     ): ResponseEntity<ErrorResponse> {
+        // Spring MVC's own exceptions, such as NoResourceFoundException (404), carry their status.
+        if (ex is SpringErrorResponse) {
+            return buildError(HttpStatus.valueOf(ex.statusCode.value()), ex.body.detail, request.requestURI)
+        }
         log.error("Unexpected error while handling request: {}", request.requestURI, ex)
         return buildError(
             HttpStatus.INTERNAL_SERVER_ERROR,
@@ -152,13 +157,13 @@ class GlobalExceptionHandler {
     private fun buildNotReadableMessage(ex: HttpMessageNotReadableException): String {
         val cause = ex.mostSpecificCause
         if (cause is InvalidNullException) {
-            val fieldName = cause.path.lastOrNull()?.fieldName
+            val fieldName = cause.path.lastOrNull()?.propertyName
             if (!fieldName.isNullOrBlank()) {
                 return "Mangler påkrevd felt: $fieldName"
             }
         }
         if (cause is MismatchedInputException) {
-            val fieldName = cause.path.lastOrNull()?.fieldName
+            val fieldName = cause.path.lastOrNull()?.propertyName
             if (!fieldName.isNullOrBlank()) {
                 return "Ugyldig verdi for felt: $fieldName"
             }

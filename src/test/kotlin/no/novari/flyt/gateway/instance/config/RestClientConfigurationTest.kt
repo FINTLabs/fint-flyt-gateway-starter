@@ -7,9 +7,10 @@ import org.junit.jupiter.api.Timeout
 import org.junit.jupiter.api.assertThrows
 import org.mockito.kotlin.mock
 import org.springframework.boot.autoconfigure.AutoConfigurations
-import org.springframework.boot.autoconfigure.http.client.HttpClientAutoConfiguration
-import org.springframework.boot.autoconfigure.security.oauth2.client.OAuth2ClientAutoConfiguration
-import org.springframework.boot.autoconfigure.web.client.RestClientAutoConfiguration
+import org.springframework.boot.http.client.autoconfigure.HttpClientAutoConfiguration
+import org.springframework.boot.http.client.autoconfigure.imperative.ImperativeHttpClientAutoConfiguration
+import org.springframework.boot.restclient.autoconfigure.RestClientAutoConfiguration
+import org.springframework.boot.security.oauth2.client.autoconfigure.OAuth2ClientAutoConfiguration
 import org.springframework.boot.test.context.assertj.AssertableApplicationContext
 import org.springframework.boot.test.context.runner.ApplicationContextRunner
 import org.springframework.http.HttpHeaders
@@ -41,8 +42,12 @@ import java.util.concurrent.atomic.AtomicInteger
 class RestClientConfigurationTest {
     private val contextRunner =
         ApplicationContextRunner()
-            .withConfiguration(AutoConfigurations.of(HttpClientAutoConfiguration::class.java))
-            .withUserConfiguration(RestClientConfiguration::class.java)
+            .withConfiguration(
+                AutoConfigurations.of(
+                    HttpClientAutoConfiguration::class.java,
+                    ImperativeHttpClientAutoConfiguration::class.java,
+                ),
+            ).withUserConfiguration(RestClientConfiguration::class.java)
             // Prototype, like Boot's builder, so the clients do not share interceptors.
             .withBean(RestClient.Builder::class.java, { RestClient.builder() }, { it.scope = "prototype" })
             .withBean(ClientRegistrationRepository::class.java, { mock<ClientRegistrationRepository>() })
@@ -171,9 +176,9 @@ class RestClientConfigurationTest {
     }
 
     @Test
-    fun `spring http client read timeout overrides the default`() {
+    fun `spring http clients read timeout overrides the default`() {
         contextRunner
-            .withPropertyValues("spring.http.client.read-timeout=200ms")
+            .withPropertyValues("spring.http.clients.read-timeout=200ms")
             .run { context ->
                 val elapsed = context.timeToReadTimeout("intgrConfRestClient")
 
@@ -191,6 +196,7 @@ class RestClientConfigurationTest {
                     AutoConfigurations.of(
                         OAuth2ClientAutoConfiguration::class.java,
                         HttpClientAutoConfiguration::class.java,
+                        ImperativeHttpClientAutoConfiguration::class.java,
                         RestClientAutoConfiguration::class.java,
                     ),
                 ).withUserConfiguration(RestClientConfiguration::class.java)
