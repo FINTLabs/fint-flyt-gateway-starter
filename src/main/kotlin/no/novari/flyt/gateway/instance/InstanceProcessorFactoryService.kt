@@ -3,16 +3,14 @@ package no.novari.flyt.gateway.instance
 import no.novari.flyt.gateway.instance.kafka.InstanceErrorEventProducerService
 import no.novari.flyt.gateway.instance.kafka.ReceivedInstanceEventProducerService
 import no.novari.flyt.gateway.instance.validation.InstanceValidationService
-import no.novari.flyt.webresourceserver.security.client.sourceapplication.SourceApplicationAuthorizationService
-import org.springframework.stereotype.Service
+import no.novari.flyt.security.FlytSecurityProperties
 
-@Service
 class InstanceProcessorFactoryService(
     private val intgrConfClient: IntgrConfClient,
     private val instanceValidationService: InstanceValidationService,
     private val receivedInstanceEventProducerService: ReceivedInstanceEventProducerService,
     private val instanceErrorEventProducerService: InstanceErrorEventProducerService,
-    private val sourceApplicationAuthorizationService: SourceApplicationAuthorizationService,
+    private val flytSecurityProperties: FlytSecurityProperties,
     private val fileClient: FileClient,
 ) {
     fun <T : Any> createInstanceProcessor(
@@ -37,7 +35,7 @@ class InstanceProcessorFactoryService(
             instanceValidationService = instanceValidationService,
             receivedInstanceEventProducerService = receivedInstanceEventProducerService,
             instanceErrorEventProducerService = instanceErrorEventProducerService,
-            sourceApplicationAuthorizationService = sourceApplicationAuthorizationService,
+            flytSecurityProperties = flytSecurityProperties,
             fileClient = fileClient,
             sourceApplicationIntegrationIdFunction = sourceApplicationIntegrationIdFunction,
             sourceApplicationInstanceIdFunction = sourceApplicationInstanceIdFunction,
@@ -67,7 +65,7 @@ class InstanceProcessorFactoryService(
             instanceValidationService = instanceValidationService,
             receivedInstanceEventProducerService = receivedInstanceEventProducerService,
             instanceErrorEventProducerService = instanceErrorEventProducerService,
-            sourceApplicationAuthorizationService = sourceApplicationAuthorizationService,
+            flytSecurityProperties = flytSecurityProperties,
             fileClient = fileClient,
             sourceApplicationIntegrationIdFunction = sourceApplicationIntegrationIdFunction,
             sourceApplicationInstanceIdFunction = sourceApplicationInstanceIdFunction,

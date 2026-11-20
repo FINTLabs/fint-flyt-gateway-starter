@@ -1,40 +1,18 @@
 package no.novari.flyt.gateway.metadata
 
 import no.novari.flyt.gateway.metadata.model.IntegrationMetadata
-import no.novari.kafka.producing.ParameterizedProducerRecord
-import no.novari.kafka.producing.ParameterizedTemplate
-import no.novari.kafka.producing.ParameterizedTemplateFactory
-import no.novari.kafka.topic.name.EventTopicNameParameters
-import no.novari.kafka.topic.name.TopicNamePrefixParameters
-import org.springframework.stereotype.Service
+import no.novari.kafka.starter.producer.send
+import no.novari.kafka.starter.topic.KafkaTopics
+import org.springframework.kafka.core.KafkaTemplate
 
-@Service
 class IntegrationMetadataProducerService(
-    templateFactory: ParameterizedTemplateFactory,
+    private val kafkaTemplate: KafkaTemplate<String, IntegrationMetadata>,
+    topics: KafkaTopics,
 ) {
-    private val template: ParameterizedTemplate<IntegrationMetadata> =
-        templateFactory.createTemplate(IntegrationMetadata::class.java)
-
-    private val integrationMetadataEventTopicNameParameters =
-        EventTopicNameParameters
-            .builder()
-            .topicNamePrefixParameters(
-                TopicNamePrefixParameters
-                    .stepBuilder()
-                    .orgIdApplicationDefault()
-                    .domainContextApplicationDefault()
-                    .build(),
-            ).eventName(INTEGRATION_METADATA_RECEIVED_EVENT_NAME)
-            .build()
+    private val topic = topics.event(INTEGRATION_METADATA_RECEIVED_EVENT_NAME)
 
     fun publishNewIntegrationMetadata(integrationMetadata: IntegrationMetadata) {
-        template.send(
-            ParameterizedProducerRecord
-                .builder<IntegrationMetadata>()
-                .topicNameParameters(integrationMetadataEventTopicNameParameters)
-                .value(integrationMetadata)
-                .build(),
-        )
+        kafkaTemplate.send(topic, integrationMetadata)
     }
 
     private companion object {

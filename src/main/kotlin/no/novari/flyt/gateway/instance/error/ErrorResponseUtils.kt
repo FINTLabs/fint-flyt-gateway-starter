@@ -10,7 +10,7 @@ object ErrorResponseUtils {
             "message" to "Request payload exceeds configured limit.",
         )
 
-    val payloadTooLargeFallback: ByteArray =
+    val payloadTooLargeJson: ByteArray =
         "{\"error\":\"payload_too_large\",\"message\":\"Request payload exceeds configured limit.\"}"
             .toByteArray(StandardCharsets.UTF_8)
 

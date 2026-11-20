@@ -3,9 +3,7 @@ package no.novari.flyt.gateway.instance.validation
 import no.novari.flyt.gateway.instance.ErrorCode
 import no.novari.flyt.kafka.model.Error
 import no.novari.flyt.kafka.model.ErrorCollection
-import org.springframework.stereotype.Service
 
-@Service
 class InstanceValidationErrorMappingService {
     fun map(instanceValidationException: InstanceValidationException): ErrorCollection =
         ErrorCollection(

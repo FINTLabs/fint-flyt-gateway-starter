@@ -2,3 +2,4 @@ no.novari.flyt.gateway.instance.config.JacksonConfiguration
 no.novari.flyt.gateway.instance.config.KafkaConfiguration
 no.novari.flyt.gateway.instance.config.MultipartConfiguration
 no.novari.flyt.gateway.instance.config.RestClientConfiguration
+no.novari.flyt.gateway.instance.config.GatewayAutoConfiguration
