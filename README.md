@@ -310,7 +310,7 @@ spring:
 
 ### Upgrading from 5.x
 
-- Requires Spring Boot 4.1+, Jackson 3 and Java 21+. flyt-kafka 8 replaces 7, and flyt-security-starter replaces
+- Requires Spring Boot 4.2+, Jackson 3 and Java 21+. flyt-kafka 8 replaces 7, and flyt-security-starter replaces
   flyt-web-resource-server 5. Follow the [Kafka migration guide](https://github.com/FINTLabs/fint-kafka-starter/blob/main/docs/migrating-from-fint-kafka.md)
   and [security migration guide](https://github.com/FINTLabs/fint-flyt-security-starter#migrating-from-fint-flyt-web-resource-server-5).
 - Set `novari.flyt.security.external.paths` to explicit gateway routes (e.g. `/api/acos/**`, not `/api/**`) and
