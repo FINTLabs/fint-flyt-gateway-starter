@@ -9,9 +9,12 @@ import org.slf4j.LoggerFactory
 import org.springframework.core.Ordered
 import org.springframework.core.annotation.Order
 import org.springframework.core.io.buffer.DataBufferLimitException
+import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.http.converter.HttpMessageNotReadableException
+import org.springframework.security.access.AccessDeniedException
+import org.springframework.security.core.AuthenticationException
 import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
@@ -119,6 +122,10 @@ class GlobalExceptionHandler {
         return buildError(status, ex.reason, request.requestURI)
     }
 
+    // Let Spring Security's ExceptionTranslationFilter answer, e.g. 403 when @PreAuthorize denies access.
+    @ExceptionHandler(AccessDeniedException::class, AuthenticationException::class)
+    fun rethrowSecurityException(ex: RuntimeException): Nothing = throw ex
+
     @ExceptionHandler(Exception::class)
     fun handleGeneric(
         ex: Exception,
@@ -126,7 +133,8 @@ class GlobalExceptionHandler {
     ): ResponseEntity<ErrorResponse> {
         // Spring MVC's own exceptions, such as NoResourceFoundException (404), carry their status.
         if (ex is SpringErrorResponse) {
-            return buildError(HttpStatus.valueOf(ex.statusCode.value()), ex.body.detail, request.requestURI)
+            // The headers include Allow for 405.
+            return buildError(HttpStatus.valueOf(ex.statusCode.value()), ex.body.detail, request.requestURI, ex.headers)
         }
         log.error("Unexpected error while handling request: {}", request.requestURI, ex)
         return buildError(
@@ -140,9 +148,11 @@ class GlobalExceptionHandler {
         status: HttpStatus,
         message: String?,
         path: String,
+        headers: HttpHeaders = HttpHeaders.EMPTY,
     ): ResponseEntity<ErrorResponse> {
         return ResponseEntity
             .status(status)
+            .headers(headers)
             .body(
                 ErrorResponse(
                     timestamp = OffsetDateTime.now(),
