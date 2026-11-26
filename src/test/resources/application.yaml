@@ -26,5 +26,10 @@ novari:
     security:
       external:
         paths: /api/test/**
-        source-application-id: 123
-        expected-client-id: test-client
+        source-application: ACOS
+
+fint:
+  flyt:
+    acos:
+      sso:
+        client-id: test-client

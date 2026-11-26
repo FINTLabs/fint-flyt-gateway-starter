@@ -81,7 +81,7 @@ class MultipartInstanceProcessorTest {
                 instanceValidationService = instanceValidationService,
                 receivedInstanceEventProducerService = receivedInstanceEventProducerService,
                 instanceErrorEventProducerService = instanceErrorEventProducerService,
-                flytSecurityProperties = flytSecurityProperties(sourceApplicationId = 123L),
+                flytSecurityProperties = flytSecurityProperties(),
                 fileClient = fileClient,
                 sourceApplicationIntegrationIdFunction = sourceApplicationIntegrationIdFunction,
                 sourceApplicationInstanceIdFunction = sourceApplicationInstanceIdFunction,
@@ -123,7 +123,7 @@ class MultipartInstanceProcessorTest {
         val fileUploadCaptor = argumentCaptor<MultipartFileUpload>()
         verify(fileClient, times(1)).postFile(fileUploadCaptor.capture())
         assertThat(fileUploadCaptor.firstValue.name).isEqualTo("document.pdf")
-        assertThat(fileUploadCaptor.firstValue.sourceApplicationId).isEqualTo(123L)
+        assertThat(fileUploadCaptor.firstValue.sourceApplicationId).isEqualTo(1L)
         assertThat(fileUploadCaptor.firstValue.sourceApplicationInstanceId).isEqualTo("instanceId")
         assertThat(fileUploadCaptor.firstValue.type).isEqualTo(MediaType.APPLICATION_PDF)
         assertThat(fileUploadCaptor.firstValue.multipartFile).isSameAs(multipartFile)

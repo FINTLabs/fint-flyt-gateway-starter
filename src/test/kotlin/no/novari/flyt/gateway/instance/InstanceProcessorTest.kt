@@ -61,7 +61,7 @@ class InstanceProcessorTest {
     @BeforeEach
     fun setUp() {
         MockitoAnnotations.openMocks(this)
-        instanceProcessor = instanceProcessor(flytSecurityProperties(sourceApplicationId = 123L))
+        instanceProcessor = instanceProcessor(flytSecurityProperties())
 
         val mockIntegration = mock<Integration>()
         whenever(mockIntegration.id).thenReturn(1L)
@@ -137,9 +137,9 @@ class InstanceProcessorTest {
 
         instanceProcessor.processInstance(Any())
 
-        verify(instanceMapper).map(eq(123L), any(), any())
+        verify(instanceMapper).map(eq(1L), any(), any())
         val headers = publishedHeaders()
-        assertThat(headers.sourceApplicationId).isEqualTo(123L)
+        assertThat(headers.sourceApplicationId).isEqualTo(1L)
         assertThat(headers.sourceApplicationIntegrationId).isEqualTo("integrationId")
         assertThat(headers.sourceApplicationInstanceId).isEqualTo("instanceId")
         assertThat(headers.integrationId).isEqualTo(1L)
@@ -147,11 +147,11 @@ class InstanceProcessorTest {
 
     @Test
     fun `fails without a configured source application id`() {
-        val processor = instanceProcessor(flytSecurityProperties(sourceApplicationId = null))
+        val processor = instanceProcessor(flytSecurityProperties(sourceApplication = null))
 
         val exception = assertThrows<IllegalStateException> { processor.processInstance(Any()) }
 
-        assertThat(exception).hasMessageContaining("novari.flyt.security.external.source-application-id")
+        assertThat(exception).hasMessageContaining("novari.flyt.security.external.source-application")
         verifyNoInteractions(instanceErrorEventProducerService, receivedInstanceEventProducerService)
     }
 

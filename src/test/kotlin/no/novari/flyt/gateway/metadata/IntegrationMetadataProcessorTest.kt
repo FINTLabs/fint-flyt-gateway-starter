@@ -27,7 +27,7 @@ class IntegrationMetadataProcessorTest {
         integrationMetadataProcessor =
             IntegrationMetadataProcessor(
                 integrationMetadataProducerService = integrationMetadataProducerService,
-                flytSecurityProperties = flytSecurityProperties(sourceApplicationId = 123L),
+                flytSecurityProperties = flytSecurityProperties(),
             )
     }
 
@@ -36,7 +36,7 @@ class IntegrationMetadataProcessorTest {
         val incomingMetadata = IncomingMetadata(id = "form-1")
         val integrationMetadata =
             IntegrationMetadata(
-                sourceApplicationId = 123L,
+                sourceApplicationId = 1L,
                 sourceApplicationIntegrationId = "form-1",
                 sourceApplicationIntegrationUri = null,
                 integrationDisplayName = "Form 1",

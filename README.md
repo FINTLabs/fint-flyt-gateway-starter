@@ -25,7 +25,7 @@ dependencies {
 ## Usage
 The starter registers its services through Spring Boot auto-configuration; no component scan is needed.
 Create a processor using the factory and delegate your controller to it. The examples use
-`novari.flyt.security.external.source-application-id`; no `Authentication` parameter is needed.
+`novari.flyt.security.external.source-application`; no `Authentication` parameter is needed.
 
 ### Endpoint security
 
@@ -37,12 +37,12 @@ novari:
     security:
       external:
         paths: /api/acos/**
-        source-application-id: 123
-        expected-client-id: ${source-app-client-id}
+        source-application: ACOS
 ```
 
-Replace the path and source application ID with your gateway's values. Load the expected client ID from the source
-application's NAM secret, as shown under [Upgrading from 5.x](#upgrading-from-5x).
+Replace the path and `SourceApplication` with your gateway's values. The expected client ID is read from
+`fint.flyt.<app>.sso.client-id`, loaded from the source application's NAM secret as shown under
+[Upgrading from 5.x](#upgrading-from-5x).
 `flyt-security-starter` validates the JWT and checks that the caller is the configured client before invoking the
 controller. These external endpoints need no additional `@PreAuthorize`; routes outside the configured chains are
 denied. Omitting `Authentication` from the controller does not make the endpoint public.
@@ -174,7 +174,7 @@ class IncomingMultipartInstanceMapper : MultipartInstanceMapper<IncomingInstance
 
 ## Metadata usage
 Gateways that expose integration metadata can use `IntegrationMetadataProcessor`.
-The processor validates the incoming metadata, reads the source application ID from `novari.flyt.security.external.source-application-id`, maps it to `IntegrationMetadata`, and publishes an `integration-metadata-received` event.
+The processor validates the incoming metadata, reads the source application ID from `novari.flyt.security.external.source-application`, maps it to `IntegrationMetadata`, and publishes an `integration-metadata-received` event.
 
 ```kotlin
 @RestController
@@ -314,16 +314,16 @@ spring:
   flyt-web-resource-server 5. Follow the [Kafka migration guide](https://github.com/FINTLabs/fint-kafka-starter/blob/main/docs/migrating-from-fint-kafka.md)
   and [security migration guide](https://github.com/FINTLabs/fint-flyt-security-starter#migrating-from-fint-flyt-web-resource-server-5).
 - Set `novari.flyt.security.external.paths` to explicit gateway routes (e.g. `/api/acos/**`, not `/api/**`) and
-  `novari.flyt.security.external.source-application-id` to the gateway's source application ID. Load
-  `novari.flyt.security.external.expected-client-id` from the source application's NAM secret:
+  `novari.flyt.security.external.source-application` to the gateway's `SourceApplication` (e.g. `ACOS`). Load the
+  source application's client ID from the NAM secret authorization-service owns:
 
   ```yaml
   # Under spec.env in the gateway's Flais configuration
-  - name: novari.flyt.security.external.expected-client-id
+  - name: fint.flyt.acos.sso.client-id
     valueFrom:
       secretKeyRef:
-        name: fint-flyt-<app>-oauth2-client
-        key: fint.sso.client-id
+        name: fint-flyt-acos-oauth2-client
+        key: fint.flyt.acos.sso.client-id
   ```
 
 - `processInstance(authentication, ...)` and `processIntegrationMetadata(authentication = ...)` are removed. Use the

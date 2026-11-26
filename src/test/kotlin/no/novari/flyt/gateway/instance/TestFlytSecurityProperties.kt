@@ -1,18 +1,18 @@
 package no.novari.flyt.gateway.instance
 
 import no.novari.flyt.security.FlytSecurityProperties
+import no.novari.flyt.security.SourceApplication
 
 /** As a gateway configures `novari.flyt.security.external`. */
-fun flytSecurityProperties(sourceApplicationId: Long? = 123L): FlytSecurityProperties =
+fun flytSecurityProperties(sourceApplication: SourceApplication? = SourceApplication.ACOS): FlytSecurityProperties =
     FlytSecurityProperties(
         external =
-            if (sourceApplicationId == null) {
+            if (sourceApplication == null) {
                 FlytSecurityProperties.External()
             } else {
                 FlytSecurityProperties.External(
                     paths = listOf("/api/test/**"),
-                    sourceApplicationId = sourceApplicationId,
-                    expectedClientId = "test-client",
+                    sourceApplication = sourceApplication,
                 )
             },
     )
