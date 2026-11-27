@@ -15,6 +15,7 @@ import no.novari.flyt.gateway.metadata.IntegrationMetadataProcessor
 import no.novari.flyt.gateway.metadata.IntegrationMetadataProducerService
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.springframework.beans.factory.getBean
 import org.springframework.boot.autoconfigure.AutoConfiguration
 import org.springframework.boot.autoconfigure.AutoConfigurations
 import org.springframework.boot.test.context.runner.ApplicationContextRunner
@@ -85,7 +86,7 @@ class GatewayAutoConfigurationTest {
         val advice = GlobalExceptionHandler()
         runner.withBean("customAdvice", GlobalExceptionHandler::class.java, { advice }).run { context ->
             assertThat(context).hasNotFailed().hasSingleBean(GlobalExceptionHandler::class.java)
-            assertThat(context.getBean(GlobalExceptionHandler::class.java)).isSameAs(advice)
+            assertThat(context.getBean<GlobalExceptionHandler>()).isSameAs(advice)
         }
     }
 
