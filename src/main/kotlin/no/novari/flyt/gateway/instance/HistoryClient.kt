@@ -1,7 +1,6 @@
 package no.novari.flyt.gateway.instance
 
 import org.springframework.beans.factory.annotation.Qualifier
-import org.springframework.stereotype.Service
 import org.springframework.web.client.HttpClientErrorException
 import org.springframework.web.client.RestClient
 import org.springframework.web.client.body
@@ -11,7 +10,6 @@ import org.springframework.web.client.body
  *
  * Returns `null` on 404.
  */
-@Service
 class HistoryClient(
     @param:Qualifier("historyRestClient")
     private val restClient: RestClient,

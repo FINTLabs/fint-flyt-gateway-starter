@@ -7,7 +7,6 @@ import no.novari.flyt.gateway.instance.model.MultipartFileReference
 import no.novari.flyt.gateway.instance.model.MultipartFileUpload
 import no.novari.flyt.gateway.instance.model.instance.InstanceObject
 import no.novari.flyt.gateway.instance.validation.InstanceValidationService
-import no.novari.flyt.webresourceserver.security.client.sourceapplication.SourceApplicationAuthorizationService
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -25,7 +24,6 @@ import org.mockito.kotlin.whenever
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.mock.web.MockMultipartFile
-import org.springframework.security.core.Authentication
 import org.springframework.web.server.ResponseStatusException
 import java.util.UUID
 import kotlin.test.assertEquals
@@ -44,9 +42,6 @@ class MultipartInstanceProcessorTest {
     private lateinit var instanceErrorEventProducerService: InstanceErrorEventProducerService
 
     @Mock
-    private lateinit var sourceApplicationAuthorizationService: SourceApplicationAuthorizationService
-
-    @Mock
     private lateinit var fileClient: FileClient
 
     @Mock
@@ -63,21 +58,15 @@ class MultipartInstanceProcessorTest {
 
     private lateinit var multipartInstanceProcessor: MultipartInstanceProcessor<Any>
 
-    private lateinit var authentication: Authentication
-
     @BeforeEach
     fun setUp() {
         MockitoAnnotations.openMocks(this)
-        authentication = mock()
 
         val mockIntegration = mock<Integration>()
         whenever(mockIntegration.id).thenReturn(1L)
         whenever(mockIntegration.state).thenReturn(Integration.State.ACTIVE)
         whenever(intgrConfClient.getIntegration(any()))
             .thenReturn(mockIntegration)
-
-        whenever(sourceApplicationAuthorizationService.getSourceApplicationId(any()))
-            .thenReturn(123L)
 
         whenever(sourceApplicationIntegrationIdFunction.invoke(any()))
             .thenReturn("integrationId")
@@ -92,7 +81,7 @@ class MultipartInstanceProcessorTest {
                 instanceValidationService = instanceValidationService,
                 receivedInstanceEventProducerService = receivedInstanceEventProducerService,
                 instanceErrorEventProducerService = instanceErrorEventProducerService,
-                sourceApplicationAuthorizationService = sourceApplicationAuthorizationService,
+                flytSecurityProperties = flytSecurityProperties(),
                 fileClient = fileClient,
                 sourceApplicationIntegrationIdFunction = sourceApplicationIntegrationIdFunction,
                 sourceApplicationInstanceIdFunction = sourceApplicationInstanceIdFunction,
@@ -128,13 +117,13 @@ class MultipartInstanceProcessorTest {
                 "test".toByteArray(),
             )
 
-        val result = multipartInstanceProcessor.processInstance(authentication, incoming, listOf(multipartFile))
+        val result = multipartInstanceProcessor.processInstance(incoming, listOf(multipartFile))
 
         assertEquals(ResponseEntity.accepted().build(), result)
         val fileUploadCaptor = argumentCaptor<MultipartFileUpload>()
         verify(fileClient, times(1)).postFile(fileUploadCaptor.capture())
         assertThat(fileUploadCaptor.firstValue.name).isEqualTo("document.pdf")
-        assertThat(fileUploadCaptor.firstValue.sourceApplicationId).isEqualTo(123L)
+        assertThat(fileUploadCaptor.firstValue.sourceApplicationId).isEqualTo(1L)
         assertThat(fileUploadCaptor.firstValue.sourceApplicationInstanceId).isEqualTo("instanceId")
         assertThat(fileUploadCaptor.firstValue.type).isEqualTo(MediaType.APPLICATION_PDF)
         assertThat(fileUploadCaptor.firstValue.multipartFile).isSameAs(multipartFile)
@@ -174,7 +163,7 @@ class MultipartInstanceProcessorTest {
                 "target".toByteArray(),
             )
 
-        multipartInstanceProcessor.processInstance(authentication, Any(), listOf(otherFile, targetFile))
+        multipartInstanceProcessor.processInstance(Any(), listOf(otherFile, targetFile))
 
         val fileUploadCaptor = argumentCaptor<MultipartFileUpload>()
         verify(fileClient).postFile(fileUploadCaptor.capture())
@@ -192,7 +181,7 @@ class MultipartInstanceProcessorTest {
 
         val exception =
             assertThrows<ResponseStatusException> {
-                multipartInstanceProcessor.processInstance(authentication, Any(), emptyList())
+                multipartInstanceProcessor.processInstance(Any(), emptyList())
             }
 
         assertThat(exception.statusCode.value()).isEqualTo(422)

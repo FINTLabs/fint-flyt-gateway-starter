@@ -7,23 +7,23 @@ import no.novari.flyt.gateway.instance.model.File
 import no.novari.flyt.gateway.instance.model.Integration
 import no.novari.flyt.gateway.instance.model.instance.InstanceObject
 import no.novari.flyt.gateway.instance.validation.InstanceValidationService
-import no.novari.flyt.webresourceserver.security.client.sourceapplication.SourceApplicationAuthorizationService
+import no.novari.flyt.kafka.instanceflow.headers.InstanceFlowHeaders
+import no.novari.flyt.security.FlytSecurityProperties
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
-import org.mockito.InjectMocks
 import org.mockito.Mock
-import org.mockito.Mockito.never
 import org.mockito.MockitoAnnotations
 import org.mockito.kotlin.any
+import org.mockito.kotlin.argumentCaptor
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
+import org.mockito.kotlin.verifyNoInteractions
 import org.mockito.kotlin.whenever
 import org.springframework.http.ResponseEntity
-import org.springframework.security.core.Authentication
 import org.springframework.web.server.ResponseStatusException
 import java.util.UUID
 import kotlin.test.assertEquals
@@ -42,9 +42,6 @@ class InstanceProcessorTest {
     private lateinit var instanceErrorEventProducerService: InstanceErrorEventProducerService
 
     @Mock
-    private lateinit var sourceApplicationAuthorizationService: SourceApplicationAuthorizationService
-
-    @Mock
     private lateinit var fileClient: FileClient
 
     @Mock
@@ -59,24 +56,18 @@ class InstanceProcessorTest {
     @Mock
     private lateinit var instanceObject: InstanceObject
 
-    @InjectMocks
     private lateinit var instanceProcessor: InstanceProcessor<Any>
-
-    private lateinit var authentication: Authentication
 
     @BeforeEach
     fun setUp() {
         MockitoAnnotations.openMocks(this)
-        authentication = mock()
+        instanceProcessor = instanceProcessor(flytSecurityProperties())
 
         val mockIntegration = mock<Integration>()
         whenever(mockIntegration.id).thenReturn(1L)
         whenever(mockIntegration.state).thenReturn(Integration.State.ACTIVE)
         whenever(intgrConfClient.getIntegration(any()))
             .thenReturn(mockIntegration)
-
-        whenever(sourceApplicationAuthorizationService.getSourceApplicationId(any()))
-            .thenReturn(123L)
 
         whenever(sourceApplicationIntegrationIdFunction.invoke(any()))
             .thenReturn("integrationId")
@@ -98,7 +89,7 @@ class InstanceProcessorTest {
         }
 
         val incoming = Any()
-        val result = instanceProcessor.processInstance(authentication, incoming)
+        val result = instanceProcessor.processInstance(incoming)
 
         assertEquals(ResponseEntity.accepted().build(), result)
         verify(fileClient, times(1)).postFile(any<File>())
@@ -119,7 +110,7 @@ class InstanceProcessorTest {
         }
 
         val incoming = Any()
-        val result = instanceProcessor.processInstance(authentication, incoming)
+        val result = instanceProcessor.processInstance(incoming)
 
         assertEquals(ResponseEntity.accepted().build(), result)
         verify(fileClient, times(3)).postFile(any<File>())
@@ -137,8 +128,52 @@ class InstanceProcessorTest {
 
         assertEquals(ResponseEntity.accepted().build(), result)
         verify(instanceMapper, times(1)).map(eq(sourceApplicationId), any(), any())
-        verify(sourceApplicationAuthorizationService, never()).getSourceApplicationId(any())
+        assertThat(publishedHeaders().sourceApplicationId).isEqualTo(sourceApplicationId)
     }
+
+    @Test
+    fun `source application id comes from the gateway's configuration`() {
+        whenever(instanceMapper.map(any(), any(), any())).thenReturn(instanceObject)
+
+        instanceProcessor.processInstance(Any())
+
+        verify(instanceMapper).map(eq(1L), any(), any())
+        val headers = publishedHeaders()
+        assertThat(headers.sourceApplicationId).isEqualTo(1L)
+        assertThat(headers.sourceApplicationIntegrationId).isEqualTo("integrationId")
+        assertThat(headers.sourceApplicationInstanceId).isEqualTo("instanceId")
+        assertThat(headers.integrationId).isEqualTo(1L)
+    }
+
+    @Test
+    fun `fails without a configured source application id`() {
+        val processor = instanceProcessor(flytSecurityProperties(sourceApplication = null))
+
+        val exception = assertThrows<IllegalStateException> { processor.processInstance(Any()) }
+
+        assertThat(exception).hasMessageContaining("novari.flyt.security.external.source-application")
+        verifyNoInteractions(instanceErrorEventProducerService, receivedInstanceEventProducerService)
+    }
+
+    private fun publishedHeaders(): InstanceFlowHeaders {
+        val captor = argumentCaptor<InstanceFlowHeaders>()
+        verify(receivedInstanceEventProducerService).publish(captor.capture(), any())
+        return captor.firstValue
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun instanceProcessor(properties: FlytSecurityProperties) =
+        InstanceProcessor(
+            intgrConfClient = intgrConfClient,
+            instanceValidationService = instanceValidationService,
+            receivedInstanceEventProducerService = receivedInstanceEventProducerService,
+            instanceErrorEventProducerService = instanceErrorEventProducerService,
+            flytSecurityProperties = properties,
+            fileClient = fileClient,
+            sourceApplicationIntegrationIdFunction = sourceApplicationIntegrationIdFunction as (Any) -> String,
+            sourceApplicationInstanceIdFunction = sourceApplicationInstanceIdFunction as (Any) -> String,
+            instanceMapper = instanceMapper,
+        )
 
     @Test
     fun shouldProcessInstanceAndHandleSecondFileFailure() {
@@ -156,7 +191,7 @@ class InstanceProcessorTest {
 
         val incoming = Any()
         val exception =
-            assertThrows<ResponseStatusException> { instanceProcessor.processInstance(authentication, incoming) }
+            assertThrows<ResponseStatusException> { instanceProcessor.processInstance(incoming) }
 
         assertThat(exception).hasMessageContaining("File upload failed")
     }

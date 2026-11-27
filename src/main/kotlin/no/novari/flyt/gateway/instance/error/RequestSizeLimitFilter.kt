@@ -1,7 +1,5 @@
 package no.novari.flyt.gateway.instance.error
 
-import com.fasterxml.jackson.core.JsonProcessingException
-import com.fasterxml.jackson.databind.ObjectMapper
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
@@ -11,16 +9,13 @@ import org.springframework.core.Ordered
 import org.springframework.core.annotation.Order
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
-import org.springframework.stereotype.Component
 import org.springframework.util.unit.DataSize
 import org.springframework.web.filter.OncePerRequestFilter
 import java.nio.charset.StandardCharsets
 
-@Component
 @Order(Ordered.HIGHEST_PRECEDENCE)
 class RequestSizeLimitFilter(
     @Value("\${novari.flyt.gateway-starter.max-request-size:100MB}") maxInMemorySize: DataSize,
-    private val objectMapper: ObjectMapper,
 ) : OncePerRequestFilter() {
     private val maxInMemoryBytes = maxInMemorySize.toBytes()
 
@@ -40,11 +35,11 @@ class RequestSizeLimitFilter(
                 maxInMemoryBytes,
             )
             discardRequestBody(request)
-            response.status = HttpStatus.PAYLOAD_TOO_LARGE.value()
+            response.status = HttpStatus.CONTENT_TOO_LARGE.value()
             response.contentType = MediaType.APPLICATION_JSON_VALUE
             response.characterEncoding = StandardCharsets.UTF_8.name()
             response.outputStream.use { output ->
-                output.write(serializeBody())
+                output.write(ErrorResponseUtils.payloadTooLargeJson)
                 output.flush()
             }
             return
@@ -60,14 +55,6 @@ class RequestSizeLimitFilter(
                 // Discard
             }
         } catch (_: Exception) {
-        }
-    }
-
-    private fun serializeBody(): ByteArray {
-        return try {
-            objectMapper.writeValueAsBytes(ErrorResponseUtils.payloadTooLargeBody)
-        } catch (e: JsonProcessingException) {
-            ErrorResponseUtils.payloadTooLargeFallback
         }
     }
 

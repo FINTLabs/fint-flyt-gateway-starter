@@ -5,10 +5,10 @@ import no.novari.flyt.gateway.instance.config.properties.JacksonConfigurationPro
 import org.springframework.boot.autoconfigure.AutoConfiguration
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
-import org.springframework.boot.autoconfigure.web.servlet.MultipartAutoConfiguration
-import org.springframework.boot.autoconfigure.web.servlet.MultipartProperties
 import org.springframework.boot.context.properties.EnableConfigurationProperties
-import org.springframework.boot.web.servlet.MultipartConfigFactory
+import org.springframework.boot.servlet.MultipartConfigFactory
+import org.springframework.boot.servlet.autoconfigure.MultipartAutoConfiguration
+import org.springframework.boot.servlet.autoconfigure.MultipartProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.core.env.Environment
 
@@ -31,19 +31,19 @@ class MultipartConfiguration {
         val factory = MultipartConfigFactory()
         factory.setMaxFileSize(
             if (environment.containsProperty("spring.servlet.multipart.max-file-size")) {
-                multipartProperties.maxFileSize ?: gatewayProperties.maxRequestSize
+                multipartProperties.maxFileSize
             } else {
                 gatewayProperties.maxRequestSize
             },
         )
         factory.setMaxRequestSize(
             if (environment.containsProperty("spring.servlet.multipart.max-request-size")) {
-                multipartProperties.maxRequestSize ?: gatewayProperties.maxRequestSize
+                multipartProperties.maxRequestSize
             } else {
                 gatewayProperties.maxRequestSize
             },
         )
-        multipartProperties.fileSizeThreshold?.let(factory::setFileSizeThreshold)
+        factory.setFileSizeThreshold(multipartProperties.fileSizeThreshold)
         multipartProperties.location
             ?.takeIf { it.isNotBlank() }
             ?.let(factory::setLocation)

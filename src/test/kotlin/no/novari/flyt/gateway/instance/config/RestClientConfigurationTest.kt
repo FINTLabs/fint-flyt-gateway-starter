@@ -6,10 +6,12 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Timeout
 import org.junit.jupiter.api.assertThrows
 import org.mockito.kotlin.mock
+import org.springframework.beans.factory.getBean
 import org.springframework.boot.autoconfigure.AutoConfigurations
-import org.springframework.boot.autoconfigure.http.client.HttpClientAutoConfiguration
-import org.springframework.boot.autoconfigure.security.oauth2.client.OAuth2ClientAutoConfiguration
-import org.springframework.boot.autoconfigure.web.client.RestClientAutoConfiguration
+import org.springframework.boot.http.client.autoconfigure.HttpClientAutoConfiguration
+import org.springframework.boot.http.client.autoconfigure.imperative.ImperativeHttpClientAutoConfiguration
+import org.springframework.boot.restclient.autoconfigure.RestClientAutoConfiguration
+import org.springframework.boot.security.oauth2.client.autoconfigure.OAuth2ClientAutoConfiguration
 import org.springframework.boot.test.context.assertj.AssertableApplicationContext
 import org.springframework.boot.test.context.runner.ApplicationContextRunner
 import org.springframework.http.HttpHeaders
@@ -41,8 +43,12 @@ import java.util.concurrent.atomic.AtomicInteger
 class RestClientConfigurationTest {
     private val contextRunner =
         ApplicationContextRunner()
-            .withConfiguration(AutoConfigurations.of(HttpClientAutoConfiguration::class.java))
-            .withUserConfiguration(RestClientConfiguration::class.java)
+            .withConfiguration(
+                AutoConfigurations.of(
+                    HttpClientAutoConfiguration::class.java,
+                    ImperativeHttpClientAutoConfiguration::class.java,
+                ),
+            ).withUserConfiguration(RestClientConfiguration::class.java)
             // Prototype, like Boot's builder, so the clients do not share interceptors.
             .withBean(RestClient.Builder::class.java, { RestClient.builder() }, { it.scope = "prototype" })
             .withBean(ClientRegistrationRepository::class.java, { mock<ClientRegistrationRepository>() })
@@ -85,7 +91,7 @@ class RestClientConfigurationTest {
     @Test
     fun `fileRestClient sends file-service token`() {
         contextRunner.run { context ->
-            val builder = context.getBean("fileRestClient", RestClient::class.java).mutate()
+            val builder = context.getBean<RestClient>("fileRestClient").mutate()
             val server = MockRestServiceServer.bindTo(builder).build()
             server
                 .expect(requestTo("http://file-service/x"))
@@ -137,7 +143,7 @@ class RestClientConfigurationTest {
         contextRunner
             .withBean("internalClientAuthorizedClientManager", OAuth2AuthorizedClientManager::class.java, { manager })
             .run { context ->
-                val builder = context.getBean("historyRestClient", RestClient::class.java).mutate()
+                val builder = context.getBean<RestClient>("historyRestClient").mutate()
                 val server = MockRestServiceServer.bindTo(builder).build()
                 server
                     .expect(
@@ -171,9 +177,9 @@ class RestClientConfigurationTest {
     }
 
     @Test
-    fun `spring http client read timeout overrides the default`() {
+    fun `spring http clients read timeout overrides the default`() {
         contextRunner
-            .withPropertyValues("spring.http.client.read-timeout=200ms")
+            .withPropertyValues("spring.http.clients.read-timeout=200ms")
             .run { context ->
                 val elapsed = context.timeToReadTimeout("intgrConfRestClient")
 
@@ -191,6 +197,7 @@ class RestClientConfigurationTest {
                     AutoConfigurations.of(
                         OAuth2ClientAutoConfiguration::class.java,
                         HttpClientAutoConfiguration::class.java,
+                        ImperativeHttpClientAutoConfiguration::class.java,
                         RestClientAutoConfiguration::class.java,
                     ),
                 ).withUserConfiguration(RestClientConfiguration::class.java)
@@ -203,7 +210,7 @@ class RestClientConfigurationTest {
                     "spring.security.oauth2.client.registration.history-service.client-secret=secret",
                 ).run { context ->
                     assertThat(context).hasNotFailed()
-                    val client = context.getBean("historyRestClient", RestClient::class.java)
+                    val client = context.getBean<RestClient>("historyRestClient")
                     val start = System.nanoTime()
                     assertThrows<RuntimeException> { client.getX() }
                     val elapsed = Duration.ofNanos(System.nanoTime() - start)
@@ -217,7 +224,7 @@ class RestClientConfigurationTest {
         beanName: String,
         url: String,
     ) {
-        val builder = getBean(beanName, RestClient::class.java).mutate()
+        val builder = getBean<RestClient>(beanName).mutate()
         val server = MockRestServiceServer.bindTo(builder).build()
         server.expect(requestTo(url)).andRespond(withSuccess())
 
@@ -230,7 +237,7 @@ class RestClientConfigurationTest {
     private fun AssertableApplicationContext.timeToReadTimeout(beanName: String): Duration =
         ServerSocket(0).use { socket ->
             val client =
-                getBean(beanName, RestClient::class.java)
+                getBean<RestClient>(beanName)
                     .mutate()
                     .baseUrl("http://localhost:${socket.localPort}")
                     .build()

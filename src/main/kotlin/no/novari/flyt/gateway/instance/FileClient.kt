@@ -8,15 +8,13 @@ import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.core.io.InputStreamResource
+import org.springframework.core.retry.RetryException
+import org.springframework.core.retry.RetryPolicy
+import org.springframework.core.retry.RetryTemplate
 import org.springframework.http.ContentDisposition
 import org.springframework.http.HttpEntity
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
-import org.springframework.retry.annotation.Backoff
-import org.springframework.retry.annotation.Recover
-import org.springframework.retry.annotation.Retryable
-import org.springframework.retry.support.RetrySynchronizationManager
-import org.springframework.stereotype.Service
 import org.springframework.util.LinkedMultiValueMap
 import org.springframework.util.MultiValueMap
 import org.springframework.web.client.RestClient
@@ -25,31 +23,25 @@ import org.springframework.web.client.RestClientResponseException
 import org.springframework.web.client.body
 import java.net.URI
 import java.nio.charset.StandardCharsets
+import java.time.Duration
 import java.util.UUID
 
-@Service
 class FileClient(
     @param:Qualifier("fileRestClient")
     private val restClient: RestClient,
     @param:Value("\${novari.flyt.file-service-url}")
     private val fileServiceUrl: String,
 ) {
-    @Retryable(
-        value = [
-            RestClientException::class,
-            FileUploadException::class,
-        ],
-        maxAttempts = MAX_ATTEMPTS,
-        backoff =
-            Backoff(
-                delay = 1_000,
-                multiplier = 2.0,
-                maxDelay = 30_000,
-            ),
-    )
-    fun postFile(file: File): UUID {
+    fun postFile(file: File): UUID = withRetry({ recover(it, file) }) { attempt -> upload(file, attempt) }
+
+    fun postFile(file: MultipartFileUpload): UUID =
+        withRetry({ recover(it, file) }) { attempt -> upload(file, attempt) }
+
+    private fun upload(
+        file: File,
+        attempt: Int,
+    ): UUID {
         val uri = fileServiceUri()
-        val attempt = currentRetryAttempt()
 
         try {
             log.debug(
@@ -111,22 +103,11 @@ class FileClient(
         }
     }
 
-    @Retryable(
-        value = [
-            RestClientException::class,
-            MultipartFileUploadException::class,
-        ],
-        maxAttempts = MAX_ATTEMPTS,
-        backoff =
-            Backoff(
-                delay = 1_000,
-                multiplier = 2.0,
-                maxDelay = 30_000,
-            ),
-    )
-    fun postFile(file: MultipartFileUpload): UUID {
+    private fun upload(
+        file: MultipartFileUpload,
+        attempt: Int,
+    ): UUID {
         val uri = fileServiceUri()
-        val attempt = currentRetryAttempt()
 
         try {
             log.debug(
@@ -191,11 +172,23 @@ class FileClient(
         }
     }
 
-    @Recover
-    fun recover(
+    /** Runs [upload] up to [MAX_ATTEMPTS] times, and gives the last failure to [recover]. */
+    private fun withRetry(
+        recover: (Throwable) -> Nothing,
+        upload: (attempt: Int) -> UUID,
+    ): UUID {
+        var attempt = 0
+        return try {
+            retryTemplate.execute { upload(++attempt) }
+        } catch (e: RetryException) {
+            recover(e.cause)
+        }
+    }
+
+    internal fun recover(
         ex: Throwable,
         file: File,
-    ): UUID {
+    ): Nothing {
         val message =
             when (ex) {
                 is FileUploadException -> ex.message
@@ -218,11 +211,10 @@ class FileClient(
         )
     }
 
-    @Recover
-    fun recover(
+    internal fun recover(
         ex: Throwable,
         file: MultipartFileUpload,
-    ): UUID {
+    ): Nothing {
         val message =
             when (ex) {
                 is MultipartFileUploadException -> ex.message
@@ -246,8 +238,6 @@ class FileClient(
     }
 
     private fun fileServiceUri(): String = fileServiceUrl.trimEnd('/') + "/api/intern-klient/filer"
-
-    private fun currentRetryAttempt(): Int = (RetrySynchronizationManager.getContext()?.retryCount ?: 0) + 1
 
     private fun File.toDebugLogString(): String =
         "base64ContentLength=${base64Contents.length}, " +
@@ -332,6 +322,23 @@ class FileClient(
 
     private companion object {
         private const val MAX_ATTEMPTS = 5
+
+        // Upload failures are thrown as FileUploadException or MultipartFileUploadException, others as
+        // RestClientException.
+        private val retryTemplate =
+            RetryTemplate(
+                RetryPolicy
+                    .builder()
+                    .maxRetries(MAX_ATTEMPTS - 1L)
+                    .delay(Duration.ofSeconds(1))
+                    .multiplier(2.0)
+                    .maxDelay(Duration.ofSeconds(30))
+                    .includes(
+                        RestClientException::class.java,
+                        FileUploadException::class.java,
+                        MultipartFileUploadException::class.java,
+                    ).build(),
+            )
         private val log = LoggerFactory.getLogger(FileClient::class.java)
     }
 }
